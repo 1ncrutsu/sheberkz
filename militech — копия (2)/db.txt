@@ -1,0 +1,48 @@
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    phone VARCHAR(50) UNIQUE,        -- Телефон должен быть уникальным
+    role VARCHAR(20) NOT NULL,       -- 'client' или 'master'
+    city VARCHAR(50),  
+    rating VARCHAR(30), 
+    about TEXT,                      -- О себе
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Таблица ЗАКАЗЫ (Orders)
+-- Задачи, которые создают клиенты 
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    client_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- Если удалить юзера, удалятся его заказы
+    title VARCHAR(255) NOT NULL,     -- Название (напр. "Починить кран")
+    description TEXT,                -- Подробное описание
+    category VARCHAR(100),           -- Категория
+    price VARCHAR(100),              -- Цена (числом или текстом "Договорная")
+    address VARCHAR(255),            -- Адрес работы
+    status VARCHAR(20) DEFAULT 'open', -- 'open' (поиск), 'in_progress' (в работе), 'closed' (готово)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Таблица ОТКЛИКИ (Offers)
+-- Когда мастер предлагает свои услуги на заказ
+CREATE TABLE offers (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE, -- Ссылка на заказ
+    master_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- Ссылка на мастера
+    price VARCHAR(100),              -- Предложенная цена мастером
+    message TEXT,                    -- Сообщение мастера ("Могу сделать за час")
+    status VARCHAR(20) DEFAULT 'pending', -- 'pending' (ждет), 'accepted' (выбран), 'rejected' (отказ)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. Таблица ОТЗЫВЫ (Reviews) - На будущее
+CREATE TABLE reviews (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id),
+    from_user_id INTEGER REFERENCES users(id), -- Кто оставил отзыв
+    to_user_id INTEGER REFERENCES users(id),   -- Кому оставили отзыв
+    rating INTEGER CHECK (rating >= 1 AND rating <= 5), -- Оценка 1-5
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
