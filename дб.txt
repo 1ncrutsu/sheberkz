@@ -1,0 +1,85 @@
+-- 1. Таблица КЛИЕНТЫ
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20) UNIQUE,
+    city VARCHAR(50),
+    photo VARCHAR(255),
+    location GEOGRAPHY(POINT, 4326),
+    email VARCHAR(255),
+    password VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Таблица МАСТЕРА
+CREATE TABLE masters (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20) UNIQUE,
+    city VARCHAR(50),
+    location GEOGRAPHY(point, 4326),
+    email VARCHAR(255),
+    password VARCHAR(255),
+    photo VARCHAR(255),
+    spec VARCHAR(100),
+    experience INTEGER,
+    about TEXT,
+    rating FLOAT DEFAULT 0,       -- Средняя оценка (авто-счет)
+    review_count INTEGER DEFAULT 0, -- Кол-во отзывов (авто-счет)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Таблица ПРЕДЛОЖЕНИЯ (Offers) - Объявления клиентов
+CREATE TABLE offers (
+    id SERIAL PRIMARY KEY,
+    client_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    price VARCHAR(50),
+    city VARCHAR(50),
+    location GEOGRAPHY(POINT, 4326),
+    address VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Таблица ЗАКАЗЫ (Orders) - Когда мастер взял в работу
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    offer_id INTEGER REFERENCES offers(id) ON DELETE CASCADE,
+    client_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    master_id INTEGER REFERENCES masters(id) ON DELETE SET NULL,
+    status VARCHAR(20) DEFAULT 'in_progress',
+    location GEOGRAPHY(point, 4326),
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP
+);
+
+-- 5. Таблица ОТЗЫВЫ (С фото и текстом)
+CREATE TABLE reviews (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+    client_id INTEGER REFERENCES users(id),
+    master_id INTEGER REFERENCES masters(id),
+    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT,
+    photos JSONB DEFAULT '[]', -- Массив ссылок на фото работ
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE OR REPLACE FUNCTION update_master_stats() RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE masters
+    SET 
+        rating = (SELECT COALESCE(AVG(rating), 0)::FLOAT FROM reviews WHERE master_id = COALESCE(NEW.master_id, OLD.master_id)),
+        review_count = (SELECT COUNT(*) FROM reviews WHERE master_id = COALESCE(NEW.master_id, OLD.master_id))
+    WHERE id = COALESCE(NEW.master_id, OLD.master_id);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER recalculate_stats_trigger
+AFTER INSERT OR UPDATE OR DELETE ON reviews
+FOR EACH ROW
+EXECUTE FUNCTION update_master_stats();
+
+SELECT * FROM USERS;
